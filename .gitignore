@@ -1,0 +1,40 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# ===== 虚拟环境 =====
+venv/
+.venv/
+env/
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+
+# ===== 数据 & 缓存（不上传，每个用户自己下载） =====
+data/trade_cal.csv
+data/factor_db.sqlite
+data/cache/*
+!data/cache/.gitkeep
+output/*
+!output/.gitkeep
+
+# ===== Tushare Token（绝对不能上传！） =====
+# config.py 中的 token 请用占位符
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb
