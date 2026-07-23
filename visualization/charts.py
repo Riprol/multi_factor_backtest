@@ -1,18 +1,54 @@
 import os
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")  # 非交互式后端，终端无 GUI 也能运行
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.font_manager as fm
 from config import OUTPUT_DIR, plt_style, FONT_FAMILY, FIG_DPI
 from utils.helpers import ensure_dir
 
 
-plt.rcParams["font.sans-serif"] = [FONT_FAMILY, "DejaVu Sans"]
-plt.rcParams["axes.unicode_minus"] = False
+def _setup_chinese_font():
+    """配置中文字体，返回实际使用的字体名"""
+    # 强制重建字体缓存
+    fm._load_fontmanager(try_read_cache=False)
+
+    # 候选字体列表
+    candidates = [FONT_FAMILY, "Microsoft YaHei", "SimHei", "SimSun",
+                  "KaiTi", "FangSong"]
+    installed = {f.name for f in fm.fontManager.ttflist}
+
+    chosen = "sans-serif"
+    for font in candidates:
+        if font in installed:
+            chosen = font
+            break
+
+    # 方式1: 设置全局 rcParams
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["font.sans-serif"] = [chosen, "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+
+    # 方式2: 重建字体缓存确保生效
+    fm._load_fontmanager(try_read_cache=False)
+    return chosen
+
+
+_CJK_FONT = _setup_chinese_font()
+print(f"[图表] 使用字体: {_CJK_FONT}")
+
+# 必须在字体设置之后应用样式，否则样式会覆盖字体
 try:
     plt.style.use(plt_style)
 except Exception:
     plt.style.use("ggplot")
+
+# 样式应用后会重置 rcParams，重新设置字体
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = [_CJK_FONT, "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
 
 
 class ChartDrawer:
@@ -40,7 +76,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"layer_net_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_ic_series(self, ic_df: pd.DataFrame, factor_label: str,
@@ -70,7 +106,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"ic_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_ic_comparison(self, all_ic_df: pd.DataFrame, save: bool = True):
@@ -78,7 +114,7 @@ class ChartDrawer:
         factor_names = all_ic_df["factor_name"].unique()
         ic_data = [all_ic_df[all_ic_df["factor_name"] == n]["rank_ic"].dropna().values
                    for n in factor_names]
-        bp = ax.boxplot(ic_data, labels=factor_names, patch_artist=True,
+        bp = ax.boxplot(ic_data, tick_labels=factor_names, patch_artist=True,
                         showmeans=True, meanprops=dict(marker="D", markerfacecolor="red"))
         for patch in bp["boxes"]:
             patch.set_facecolor("#A8DADC")
@@ -91,7 +127,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, "ic_comparison.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_portfolio_nav(self, portfolio_df: pd.DataFrame, factor_label: str,
@@ -123,7 +159,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"nav_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_factor_correlation(self, factor_names: list,
@@ -148,5 +184,5 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, "factor_corr.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig

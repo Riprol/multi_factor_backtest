@@ -1,6 +1,6 @@
 import os
 
-TUSHARE_TOKEN = "your_tushare_token_here"
+TUSHARE_TOKEN = "your tushare token"
 
 START_DATE = "start date"
 END_DATE   = "end date"
@@ -27,5 +27,5 @@ REBALANCE_FREQ = "M"
 WEIGHT_METHOD = "equal"
 
 plt_style   = "seaborn-v0_8-darkgrid"
-FONT_FAMILY = "SimHei"
+FONT_FAMILY = "Microsoft YaHei"
 FIG_DPI     = 150

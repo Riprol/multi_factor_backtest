@@ -27,6 +27,7 @@ data/cache/*
 !data/cache/.gitkeep
 output/*
 !output/.gitkeep
+output_log.txt
 
 # ===== Tushare Token（绝对不能上传！） =====
 # config.py 中的 token 请用占位符

@@ -11,7 +11,7 @@ import numpy as np
 
 from config import (
     TUSHARE_TOKEN, START_DATE, END_DATE,
-    LAYER_NUM, TOP_N, REBALANCE_FREQ
+    LAYER_NUM, TOP_N, REBALANCE_FREQ, OUTPUT_DIR
 )
 
 from data.calendar import TradeCalendar
@@ -36,7 +36,7 @@ from visualization.charts import ChartDrawer
 from visualization.report import ReportGenerator
 
 from utils.database import FactorDatabase
-from utils.helpers import timer
+from utils.helpers import timer, ensure_dir
 
 
 def register_all_factors():
@@ -82,7 +82,7 @@ def run_ic_analysis(db: FactorDatabase):
     print("\n[IC 汇总]")
     print(summary.to_string(index=False))
 
-    ic_csv_path = os.path.join("output", "ic_summary.csv")
+    ic_csv_path = os.path.join(OUTPUT_DIR, "ic_summary.csv")
     all_ic.to_csv(ic_csv_path, index=False)
     print(f"\n[IC] IC明细已保存至 {ic_csv_path}")
 
@@ -176,6 +176,7 @@ def main():
     print(f"  回测区间: {START_DATE} ~ {END_DATE}")
     print("=" * 60)
 
+    ensure_dir(OUTPUT_DIR)
     register_all_factors()
     db, clean_df = prepare_data()
     compute_factors(db, clean_df)
