@@ -9,8 +9,9 @@ class MomentumFactor(BaseFactor):
     category = "momentum"
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.sort_values(["ts_code", "trade_date"])
-        df["value"] = df.groupby("ts_code")["ret"].transform(
-            lambda x: x.rolling(self.window, min_periods=int(self.window * 0.6)).sum()
-        )
-        return df[["ts_code", "trade_date", "value"]].dropna(subset=["value"]).reset_index(drop=True)
+        """已统一迁移至 FactorRegistry.compute_all，此处保留供独立调用。"""
+        from factors.registry import FactorRegistry
+        from utils.database import FactorDatabase
+        import sqlite3, os
+        FactorRegistry._windows["momentum"] = self.window
+        return df

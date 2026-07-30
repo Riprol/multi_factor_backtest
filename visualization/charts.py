@@ -1,18 +1,54 @@
 import os
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")  # 非交互式后端，终端无 GUI 也能运行
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.font_manager as fm
 from config import OUTPUT_DIR, plt_style, FONT_FAMILY, FIG_DPI
 from utils.helpers import ensure_dir
 
 
-plt.rcParams["font.sans-serif"] = [FONT_FAMILY, "DejaVu Sans"]
-plt.rcParams["axes.unicode_minus"] = False
+def _setup_chinese_font():
+    """配置中文字体，返回实际使用的字体名"""
+    # 强制重建字体缓存
+    fm._load_fontmanager(try_read_cache=False)
+
+    # 候选字体列表
+    candidates = [FONT_FAMILY, "Microsoft YaHei", "SimHei", "SimSun",
+                  "KaiTi", "FangSong"]
+    installed = {f.name for f in fm.fontManager.ttflist}
+
+    chosen = "sans-serif"
+    for font in candidates:
+        if font in installed:
+            chosen = font
+            break
+
+    # 方式1: 设置全局 rcParams
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["font.sans-serif"] = [chosen, "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+
+    # 方式2: 重建字体缓存确保生效
+    fm._load_fontmanager(try_read_cache=False)
+    return chosen
+
+
+_CJK_FONT = _setup_chinese_font()
+print(f"[图表] 使用字体: {_CJK_FONT}")
+
+# 必须在字体设置之后应用样式，否则样式会覆盖字体
 try:
     plt.style.use(plt_style)
 except Exception:
     plt.style.use("ggplot")
+
+# 样式应用后会重置 rcParams，重新设置字体
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = [_CJK_FONT, "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
 
 
 class ChartDrawer:
@@ -40,7 +76,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"layer_net_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_ic_series(self, ic_df: pd.DataFrame, factor_label: str,
@@ -70,7 +106,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"ic_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_ic_comparison(self, all_ic_df: pd.DataFrame, save: bool = True):
@@ -78,7 +114,7 @@ class ChartDrawer:
         factor_names = all_ic_df["factor_name"].unique()
         ic_data = [all_ic_df[all_ic_df["factor_name"] == n]["rank_ic"].dropna().values
                    for n in factor_names]
-        bp = ax.boxplot(ic_data, labels=factor_names, patch_artist=True,
+        bp = ax.boxplot(ic_data, tick_labels=factor_names, patch_artist=True,
                         showmeans=True, meanprops=dict(marker="D", markerfacecolor="red"))
         for patch in bp["boxes"]:
             patch.set_facecolor("#A8DADC")
@@ -91,7 +127,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, "ic_comparison.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_portfolio_nav(self, portfolio_df: pd.DataFrame, factor_label: str,
@@ -123,7 +159,7 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, f"nav_{factor_label}.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
         return fig
 
     def plot_factor_correlation(self, factor_names: list,
@@ -148,5 +184,71 @@ class ChartDrawer:
             path = os.path.join(self.output_dir, "factor_corr.png")
             fig.savefig(path, dpi=FIG_DPI)
             print(f"  [图表] 已保存 {path}")
-        plt.show()
+        plt.close(fig)
+        return fig
+
+    def plot_ic_distribution(self, ic_df: pd.DataFrame, factor_label: str,
+                              save: bool = True):
+        """IC 直方图 + QQ 图（检验正态性近似）"""
+        from scipy.stats import probplot
+        ic = ic_df["rank_ic"].dropna().values
+        if len(ic) < 10:
+            return None
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+        ax1.hist(ic, bins=30, color="#457B9D", alpha=0.7, edgecolor="white")
+        ax1.axvline(x=0, color="gray", ls="--")
+        ax1.axvline(x=np.mean(ic), color="#E63946", ls="-", label=f"均值={np.mean(ic):.4f}")
+        ax1.set_title(f"{factor_label} IC 分布", fontsize=12, fontweight="bold")
+        ax1.set_xlabel("Rank IC")
+        ax1.set_ylabel("频数")
+        ax1.legend()
+        ax1.grid(alpha=0.3)
+
+        (osm, osr), (slope, intercept, r) = probplot(ic, dist="norm")
+        ax2.scatter(osm, osr, s=8, color="#457B9D", alpha=0.6)
+        ax2.plot(osm, slope * osm + intercept, color="#E63946", lw=1.5,
+                 label=f"R={r:.3f}")
+        ax2.set_title(f"{factor_label} Q-Q Plot", fontsize=12, fontweight="bold")
+        ax2.set_xlabel("理论分位数")
+        ax2.set_ylabel("样本分位数")
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+
+        fig.tight_layout()
+        if save:
+            path = os.path.join(self.output_dir, f"ic_dist_{factor_label}.png")
+            fig.savefig(path, dpi=FIG_DPI)
+            print(f"  [图表] 已保存 {path}")
+        plt.close(fig)
+        return fig
+
+    def plot_group_boxplot(self, daily_layer_ret: pd.DataFrame,
+                            factor_label: str, save: bool = True):
+        """分层收益箱线图。daily_layer_ret: index=trade_date, columns=layer"""
+        data = [daily_layer_ret[col].dropna().values
+                for col in daily_layer_ret.columns]
+        labels = [f"第{int(c)}层" for c in daily_layer_ret.columns]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bp = ax.boxplot(data, tick_labels=labels, patch_artist=True,
+                        showmeans=True,
+                        meanprops=dict(marker="D", markerfacecolor="#E63946",
+                                       markersize=6))
+        colors = plt.cm.RdYlGn(np.linspace(0.15, 0.85, len(data)))
+        for patch, c in zip(bp["boxes"], colors):
+            patch.set_facecolor(c)
+
+        ax.axhline(y=0, color="gray", ls="--", alpha=0.5)
+        ax.set_title(f"{factor_label} 分层收益分布", fontsize=14, fontweight="bold")
+        ax.set_ylabel("未来一期收益")
+        ax.grid(axis="y", alpha=0.3)
+        fig.tight_layout()
+
+        if save:
+            path = os.path.join(self.output_dir, f"boxplot_{factor_label}.png")
+            fig.savefig(path, dpi=FIG_DPI)
+            print(f"  [图表] 已保存 {path}")
+        plt.close(fig)
         return fig

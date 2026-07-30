@@ -13,10 +13,7 @@ class LayerBacktester:
 
     def _load_market(self, start: str, end: str):
         if self.market_df is None:
-            df = self.db.load_market(start, end)
-            df = df.sort_values(["ts_code", "trade_date"])
-            df["future_ret"] = df.groupby("ts_code")["ret"].shift(-1)
-            self.market_df = df
+            self.market_df = self.db.load_market_with_future(start, end)
         return self.market_df
 
     def run(self, factor_name: str, start: str, end: str) -> dict:
@@ -57,9 +54,19 @@ class LayerBacktester:
         cum_net = (1 + pivot).cumprod()
 
         ls_df = pd.DataFrame(long_short_records)
+        ls_stats = {}
         if not ls_df.empty:
             ls_df["trade_date"] = pd.to_datetime(ls_df["trade_date"])
             ls_df = ls_df.set_index("trade_date")
             ls_df["cum_long_short"] = (1 + ls_df["long_short_ret"]).cumprod()
+            ls_cum = ls_df["cum_long_short"]
+            ls_peak = ls_cum.cummax()
+            ls_dd = ((ls_cum - ls_peak) / ls_peak).min()
+            ls_stats = {
+                "ls_mean": float(ls_df["long_short_ret"].mean()),
+                "ls_vol": float(ls_df["long_short_ret"].std()),
+                "ls_max_dd": float(ls_dd),
+            }
 
-        return {"daily_layer_ret": pivot, "cum_net_value": cum_net, "long_short": ls_df}
+        return {"daily_layer_ret": pivot, "cum_net_value": cum_net,
+                "long_short": ls_df, "ls_stats": ls_stats}

@@ -10,9 +10,7 @@ class LiquidityFactor(BaseFactor):
     category = "volume"
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.sort_values(["ts_code", "trade_date"])
-        df["illiq"] = df["ret"].abs() / (df["amount"] / 10000 + 1)
-        df["value"] = -df.groupby("ts_code")["illiq"].transform(
-            lambda x: x.rolling(self.window, min_periods=int(self.window * 0.6)).mean()
-        )
-        return df[["ts_code", "trade_date", "value"]].dropna(subset=["value"]).reset_index(drop=True)
+        """已统一迁移至 FactorRegistry.compute_all，此处保留供独立调用。"""
+        from factors.registry import FactorRegistry
+        FactorRegistry._windows["liquidity"] = self.window
+        return df

@@ -28,3 +28,43 @@ class DataCleaner:
         after = df.shape[0]
         print(f"[清洗器] {before} -> {after} 条 (剔除 {before-after} 条脏数据)")
         return df.reset_index(drop=True)
+
+    @staticmethod
+    def filter_by_index_db(df: pd.DataFrame, db, index_code: str) -> pd.DataFrame:
+        """
+        基于 SQLite 中 index_weights 表做月度截面过滤。
+        逻辑：对每一行，取 trade_date 的前 6 位（YYYYMM），
+        匹配 index_weights 中同月的成分股。不匹配的剔除。
+        这是动态成分——每月使用当月真实成分名单，杜绝未来函数。
+        """
+        if index_code is None:
+            return df
+
+        iw = db.get_index_stocks(index_code)
+        if iw.empty:
+            print(f"[指数过滤] {index_code} 无成分数据，跳过过滤")
+            return df
+
+        # 构建 "YYYYMM" -> set(con_code) 映射
+        iw["ym"] = iw["trade_date"].str[:6]
+        monthly_set = iw.groupby("ym")["con_code"].apply(set).to_dict()
+
+        before = df.shape[0]
+        df = df.copy()
+        df["_ym"] = df["trade_date"].str[:6]
+
+        # 向量化：对每个月份批量过滤
+        keep = pd.Series(False, index=df.index)
+        for ym, stocks in monthly_set.items():
+            idx = df[df["_ym"] == ym].index
+            keep[idx] = df.loc[idx, "ts_code"].isin(stocks)
+
+        # 没有成分数据的月份默认保留（避免因数据缺失误删）
+        no_data_mask = ~df["_ym"].isin(monthly_set.keys())
+        keep = keep | no_data_mask
+
+        df = df[keep].drop(columns=["_ym"])
+        after = df.shape[0]
+        print(f"[指数过滤] {index_code} (动态成分): {before} -> {after} 条"
+              f" ({len(monthly_set)} 个月份, 剔除 {before-after} 条非成分股)")
+        return df.reset_index(drop=True)
