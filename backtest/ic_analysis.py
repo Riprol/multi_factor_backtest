@@ -16,6 +16,11 @@ class ICAnalyzer:
         return self.market_df
 
     def compute_ic_series(self, factor_name: str, start: str, end: str) -> pd.DataFrame:
+        """逐日计算 Rank IC & Pearson IC。
+
+        时间对齐：factor_value(signal_date=t) 对应 future_ret(return_date=t+1)
+        future_ret 由 load_market_with_future 通过 shift(-1) 生成，无前瞻偏差。
+        """
         factor_df = self.db.load_factor(factor_name, start, end)
         market = self._load_market(start, end)
 

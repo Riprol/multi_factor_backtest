@@ -55,6 +55,8 @@ class PortfolioBuilder:
         holdings_map = {}
         for rb_date in rebalance_dates:
             day_factor = factor_df[factor_df["trade_date"] == rb_date]
+            # 时间对齐：signal_date=rb_date，用当日盘后因子值选股
+            # return_date 从 rb_date+1 起，由 daily_ret 逐日累加
             if day_factor.empty:
                 continue
 

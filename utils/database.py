@@ -139,7 +139,11 @@ class FactorDatabase:
         return pd.DataFrame(rows, columns=[d[0] for d in cur.description])
 
     def load_market_with_future(self, start: str, end: str) -> pd.DataFrame:
-        """行情 + 未来收益。ic_analysis / layer_backtest 共用。"""
+        """行情 + 未来收益（ic_analysis / layer_backtest 共用）。
+
+        时间对齐：每行 signal_date=trade_date，future_ret=return_date=t+1。
+        shift(-1) 保证因子值(t) 只预测下一期收益(t+1)，无前瞻偏差。
+        """
         df = self.load_market(start, end)
         df["future_ret"] = df.groupby("ts_code")["ret"].shift(-1)
         return df

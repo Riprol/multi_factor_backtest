@@ -39,6 +39,9 @@ class BaseFactor(ABC):
         df = df.dropna(subset=[value_col])
 
         # 3. 行业+市值中性化（可选）
+        # CRITICAL: industry_col 必须与 trade_date 严格对应。
+        # 若行业数据为静态快照（未按日期区分），会引入前瞻偏差——
+        # 例如 2024 年变更行业的公司，在 2023 年的回测中会被错误归类。
         if industry_col and industry_col in df.columns:
             from utils.regression import neutralize_industry_style
             for date, grp in df.groupby(date_col):
