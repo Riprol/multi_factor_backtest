@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 TUSHARE_TOKEN = "your tushare token"
 

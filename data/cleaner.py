@@ -1,12 +1,13 @@
 import pandas as pd
 import numpy as np
-from config import MIN_PRICE, DROP_LIMIT
+from config import MIN_PRICE, DROP_LIMIT, MIN_LIST_DAYS
 
 
 class DataCleaner:
 
     @staticmethod
-    def clean(raw_df: pd.DataFrame) -> pd.DataFrame:
+    def clean(raw_df: pd.DataFrame,
+              stock_basic: pd.DataFrame = None) -> pd.DataFrame:
         df = raw_df.copy()
         df["ts_code"]    = df["ts_code"].astype(str)
         df["trade_date"] = df["trade_date"].astype(str)
@@ -23,11 +24,46 @@ class DataCleaner:
             df = df.drop(columns=["ret_abs"])
 
         df = df[df["close"] >= MIN_PRICE]
+
+        # ST / 次新股过滤
+        if stock_basic is not None and not stock_basic.empty:
+            df = DataCleaner._filter_st_and_new(df, stock_basic)
+
         df = df.drop_duplicates(subset=["ts_code", "trade_date"])
 
         after = df.shape[0]
         print(f"[清洗器] {before} -> {after} 条 (剔除 {before-after} 条脏数据)")
         return df.reset_index(drop=True)
+
+    @staticmethod
+    def _filter_st_and_new(df: pd.DataFrame,
+                            stock_basic: pd.DataFrame) -> pd.DataFrame:
+        """剔除 ST/*ST 和上市不足 MIN_LIST_DAYS 交易日的次新股。
+
+        stock_basic 需含 ts_code, name, list_date 列。
+        """
+        info = stock_basic[["ts_code", "name", "list_date"]].copy()
+        info["list_date"] = pd.to_datetime(info["list_date"], errors="coerce")
+
+        # ST 标记
+        st_codes = set(info[info["name"].str.contains("ST", na=False)]["ts_code"])
+
+        before = df.shape[0]
+        df = df[~df["ts_code"].isin(st_codes)]
+
+        # 次新股：trade_date - list_date < MIN_LIST_DAYS → 剔除
+        if "list_date" in info.columns and MIN_LIST_DAYS > 0:
+            info_dict = dict(zip(info["ts_code"], info["list_date"]))
+            df["_list_date"] = df["ts_code"].map(info_dict)
+            df["trade_dt"] = pd.to_datetime(df["trade_date"], errors="coerce")
+            df["_listed_days"] = (df["trade_dt"] - df["_list_date"]).dt.days
+            df = df[df["_listed_days"] >= MIN_LIST_DAYS]
+            df = df.drop(columns=["_list_date", "trade_dt", "_listed_days"])
+
+        after = df.shape[0]
+        if before != after:
+            print(f"  [ST/次新] {before} -> {after} 只 (剔除 {before-after} 只)")
+        return df
 
     @staticmethod
     def filter_by_index_db(df: pd.DataFrame, db, index_code: str) -> pd.DataFrame:

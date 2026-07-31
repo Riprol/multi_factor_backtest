@@ -56,7 +56,8 @@ def prepare_data():
     downloader = DataDownloader(token=TUSHARE_TOKEN)
     raw_df = downloader.download_range(START_DATE, END_DATE, db=db)
 
-    clean_df = DataCleaner.clean(raw_df)
+    stock_basic = downloader.download_stock_basic()
+    clean_df = DataCleaner.clean(raw_df, stock_basic=stock_basic)
     db.save_market(clean_df)
 
     # ── 指数成分股：拉取 → 存 SQLite → 截面过滤 ──

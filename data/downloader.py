@@ -109,3 +109,20 @@ class DataDownloader:
             print("[指数成分] 无数据源，回退全市场模式")
 
         return result
+
+    def download_stock_basic(self, db=None) -> pd.DataFrame:
+        """下载全市场股票基础信息（list_date, name, industry），缓存到 SQLite。"""
+        csv_path = os.path.join(CACHE_DIR, "stock_basic.csv")
+        if os.path.exists(csv_path):
+            print("[股票信息] 命中缓存")
+            return pd.read_csv(csv_path, dtype={"ts_code": str})
+
+        print("[股票信息] 从 Tushare 下载 stock_basic ...")
+        fields = "ts_code,name,industry,list_date,list_status"
+        df = self.pro.stock_basic(exchange="", list_status="L", fields=fields)
+        if df is not None and not df.empty:
+            df["list_date"] = df["list_date"].astype(str)
+            df.to_csv(csv_path, index=False)
+            print(f"[股票信息] 已缓存 {len(df)} 只")
+            return df
+        return pd.DataFrame()
