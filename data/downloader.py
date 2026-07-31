@@ -11,7 +11,7 @@ class DataDownloader:
 
     def __init__(self, token: str = TUSHARE_TOKEN):
         self.pro = ts.pro_api(token)
-        self.cal = TradeCalendar()
+        self.cal = TradeCalendar(pro=self.pro)
         ensure_dir(CACHE_DIR)
 
     @timer
