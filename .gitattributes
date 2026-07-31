@@ -1,0 +1,6 @@
+# 所有文本文件使用 UTF-8 编码
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.csv text
+*.txt text
