@@ -216,6 +216,21 @@ def main():
             print(f"\n  {fname}:")
             print(sub[["year", "ic_mean", "icir"]].to_string(index=False))
 
+    # ── 行业+市值中性化后的 IC 分析 ──
+    neutral_ic_summary = None
+    if analyzer is not None and all_ic is not None and not all_ic.empty:
+        print("\n" + "=" * 60)
+        print("  行业中性和市值中性化后的 IC 分析")
+        print("=" * 60)
+        factor_names = FactorRegistry.list_all()
+        neutral_all_ic = analyzer.compute_all_factors_neutral_ic(factor_names, START_DATE, END_DATE)
+        if not neutral_all_ic.empty:
+            neutral_ic_summary = analyzer.ic_summary_with_ci(neutral_all_ic)
+            print("\n[中性化 IC 汇总]")
+            print(neutral_ic_summary.to_string(index=False))
+        else:
+            print("[中性化IC] 无有效数据，跳过")
+
     if ic_summary is not None:
         ic_for_weight = ic_summary.rename(columns={
             "factor_name": "factor_name",
@@ -246,7 +261,8 @@ def main():
         report.generate(ic_summary if ic_summary is not None else pd.DataFrame(),
                        perf_df, layer_results,
                        yearly_ic=yearly_ic, risk_stats=risk_stats_all,
-                       factor_corr=factor_corr)
+                       factor_corr=factor_corr,
+                       neutral_ic_summary=neutral_ic_summary)
 
     db.close()
 

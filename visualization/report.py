@@ -18,7 +18,8 @@ class ReportGenerator:
                  yearly_ic: pd.DataFrame = None,
                  risk_stats: dict = None,
                  factor_corr: pd.DataFrame = None,
-                 factor_desc: dict = None) -> str:
+                 factor_desc: dict = None,
+                 neutral_ic_summary: pd.DataFrame = None) -> str:
         lines = []
         lines.append("# 多因子回测报告")
         lines.append(f"\n> 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -56,6 +57,31 @@ class ReportGenerator:
                     f"| {row['ic_mean']:.4f} "
                     f"| {row['icir']:.2f} "
                     f"| {row['ic_positive_ratio']:.1%} "
+                    f"| {int(row['obs_count'])} |"
+                )
+
+        if neutral_ic_summary is not None and not neutral_ic_summary.empty:
+            lines.append("\n### 行业+市值中性化后的因子 IC（纯因子暴露）\n")
+            lines.append("> 因子值剔除行业和市值（ln_cap）影响后的残差 IC，反映因子自身的独立预测能力。\n")
+            lines.append("| 因子 | IC均值 | ICIR | IC>0占比 | t值 | p值 | 95%CI下 | 95%CI上 | 0在区间内 | 样本 |")
+            lines.append("|------|--------|------|----------|-----|-----|---------|---------|-----------|------|")
+            for _, row in neutral_ic_summary.iterrows():
+                ci_low = row.get("ci_lower", float("nan"))
+                ci_high = row.get("ci_upper", float("nan"))
+                zero_in = row.get("zero_inside", None)
+                flag = "Yes" if zero_in else ("No" if zero_in is False else "-")
+                tv = row.get("t_value", float("nan"))
+                pv = row.get("p_value", float("nan"))
+                lines.append(
+                    f"| {row['factor_name']} "
+                    f"| {row['ic_mean']:.4f} "
+                    f"| {row['icir']:.2f} "
+                    f"| {row['ic_positive_ratio']:.1%} "
+                    f"| {tv:.2f} "
+                    f"| {pv:.4f} "
+                    f"| {ci_low:.4f} "
+                    f"| {ci_high:.4f} "
+                    f"| {flag} "
                     f"| {int(row['obs_count'])} |"
                 )
 

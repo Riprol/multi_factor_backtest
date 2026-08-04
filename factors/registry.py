@@ -40,35 +40,41 @@ class FactorRegistry:
         df = market_df.sort_values(["ts_code", "trade_date"]).copy()
         df["vol_mean"] = df.groupby("ts_code")["vol"].transform("mean")
         df["daily_turn"] = df["vol"] / df["vol_mean"]          # 标准化换手率
-        df["illiq"] = df["ret"].abs() / (df["amount"] / 10000 + 1)  # 非流动性
+
+        # ★ 前瞻偏差修正：因子值在日期 T 只应使用 T-1 及之前的行情数据。
+        #   具体做法：ret[T] 代表 T 日收盘相对 T-1 日收盘的收益，
+        #   用 shift(1) 将 ret 对齐到因子信号日期：
+        #     mom_val[T] = sum(ret[T-20] + ... + ret[T-1])  ← 不含 ret[T]
+        g = df.groupby("ts_code")
+        df["ret_lag1"] = g["ret"].shift(1)
+        df["illiq_lag1"] = df["ret_lag1"].abs() / (df["amount"] / 10000 + 1)
 
         # ── 2. 统一 groupby，用 C 级 rolling 内置聚合计算所有因子 ──
-        g = df.groupby("ts_code")
 
-        # 动量: ret 20 日滚动求和
+        # 动量: ret_lag1 20 日滚动求和（不含当日收益，避免前瞻偏差）
         if "momentum" in factor_names:
             w = cls._windows.get("momentum", 20)
-            df["mom_val"] = g["ret"].rolling(w, min_periods=max(1, int(w * 0.6))).sum().values
+            df["mom_val"] = g["ret_lag1"].rolling(w, min_periods=max(1, int(w * 0.6))).sum().values
 
-        # 反转: -ret 5 日滚动求和
+        # 反转: -ret_lag1 5 日滚动求和
         if "reversal" in factor_names:
             w = cls._windows.get("reversal", 5)
-            df["rev_val"] = -g["ret"].rolling(w, min_periods=max(1, int(w * 0.6))).sum().values
+            df["rev_val"] = -g["ret_lag1"].rolling(w, min_periods=max(1, int(w * 0.6))).sum().values
 
-        # 波动率: -ret 20 日滚动标准差
+        # 波动率: -ret_lag1 20 日滚动标准差
         if "volatility" in factor_names:
             w = cls._windows.get("volatility", 20)
-            df["vol_val"] = -g["ret"].rolling(w, min_periods=max(1, int(w * 0.6))).std().values
+            df["vol_val"] = -g["ret_lag1"].rolling(w, min_periods=max(1, int(w * 0.6))).std().values
 
-        # 换手率: -daily_turn 20 日滚动均值
+        # 换手率: -daily_turn 20 日滚动均值（未涉及 ret，无需 shift）
         if "turnover" in factor_names:
             w = cls._windows.get("turnover", 20)
             df["turn_val"] = -g["daily_turn"].rolling(w, min_periods=max(1, int(w * 0.6))).mean().values
 
-        # 流动性: illiq 20 日滚动均值（非流动性越高越差，不取反）
+        # 流动性: -illiq_lag1 20 日滚动均值（取反：高值=高流动性=高预期收益）
         if "liquidity" in factor_names:
             w = cls._windows.get("liquidity", 20)
-            df["liq_val"] = g["illiq"].rolling(w, min_periods=max(1, int(w * 0.6))).mean().values
+            df["liq_val"] = -g["illiq_lag1"].rolling(w, min_periods=max(1, int(w * 0.6))).mean().values
 
         # ── 3. 截面清洗 + 保存 ──
         col_map = {
